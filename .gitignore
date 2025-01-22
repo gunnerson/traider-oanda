@@ -1,0 +1,13 @@
+*.log
+*.pot
+*.pyc
+*.bak
+*.sh
+*.csv
+__pycache__
+*.sqlite3
+media
+static/
+deploy
+.env
+celerybeat-schedule*

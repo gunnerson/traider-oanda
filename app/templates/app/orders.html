@@ -1,0 +1,54 @@
+{% extends "index.html" %}
+{% load app_extras %}
+{% block content %}
+  <div class="w-full overflow-x-auto">
+    <table class="table table-hover table-dark table-striped">
+      <thead>
+        <tr class="bg-white">
+          <th class="text-center">N</th>
+          <th class="text-center">Instrument</th>
+          <th class="text-center">Type</th>
+          <th class="text-center">Interval</th>
+          <th class="text-center">Open</th>
+          <th class="text-center">Close</th>
+          <th class="text-center">RVR</th>
+          <th class="text-center">NET</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+          <tr class="{% if order.close_status == 'T' %}bg-green-700{% else %}bg-red-700{% endif %}">
+            <td class="text-center">
+              <a href="{% url 'admin:app_order_change' order.id %}" target="_blank">&nbsp;&nbsp;&nbsp;{{ order.id }}&nbsp;&nbsp;&nbsp;</a>
+            </td>
+            <td class="text-center">
+              <a href="{% url 'admin:app_bot_change' order.bot.id %}" target="_blank">&nbsp;&nbsp;&nbsp;{{ order.bot.pair.base.name }}&nbsp;&nbsp;&nbsp;</a>
+            </td>
+            <td class="text-center">{{ order.get_order_dir_display }}</td>
+            <td class="text-center">{{ order.get_interval_display }}</td>
+            <td class="text-center">{{ order.opentm|date:"m/d D H:i" }}</td>
+            <td class="text-center">{{ order.closetm|date:"D H:i" }}</td>
+            <td class="text-center">{{ order.rvr }}</td>
+            <td class="text-center">${{ order.net }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="bg-white">
+          <td class="text-center font-bold">
+            WON: <span class="text-{% if pr %}green-700{% else %}red-700{% endif %}">{{ ww }}%</span> / <span class="font-bold">{{ a }}</span>
+          </td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td class="text-center font-bold">
+            AVG: <span class="text-green-700">{{ rwa }}</span> / <span class="text-red-700">{{ rla }}</span>
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+{% endblock content %}

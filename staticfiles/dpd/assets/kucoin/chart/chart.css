@@ -1,0 +1,43 @@
+:root {
+  --main-bg-color: white;
+  --main-fg-color: rgb(15 23 42);
+  --border-color: rgb(222, 226, 230);
+}
+
+body {
+  background: var(--main-bg-color);
+  color: var(--main-fg-color);
+}
+
+button,
+input {
+  background-color: inherit;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+}
+
+.Select-control {
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.8;
+}
+
+#interval-radio label {
+  cursor: pointer !important;
+}
+
+input:invalid {
+  border: 1px solid var(--main-fg-color) !important;
+  outline: none;
+}

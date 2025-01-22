@@ -1,0 +1,131 @@
+{% extends "index.html" %}
+{% block content %}
+  <div class="flex flex-col gap-4 max-h-full">
+    <div class="flex items-center gap-4">
+      <span><b>{{ bg.name }}</b></span>
+      <span><b>Balance:</b> {{ bg.balance|floatformat:2 }} USD</span>
+      {% if bg.on_status %}
+        <a href="{% url 'app:bot_stop' bg.id %}" title="Pause">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="24"
+               height="24"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="lucide lucide-circle-pause">
+            <circle cx="12" cy="12" r="10" /><line x1="10" x2="10" y1="15" y2="9" /><line x1="14" x2="14" y1="15" y2="9" />
+          </svg>
+        </a>
+      {% else %}
+        <a href="{% url 'app:bot_start' bg.id %}" title="Start">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="24"
+               height="24"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="lucide lucide-circle-play">
+            <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
+          </svg>
+        </a>
+      {% endif %}
+      <a href="{% url 'app:bot_reset' bg.id %}"
+         title="Reset"
+         onclick="return confirm('Are you sure?')">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             width="24"
+             height="24"
+             viewBox="0 0 24 24"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="2"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             class="lucide lucide-rotate-ccw">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+      </a>
+      <a href="{% url 'admin:app_botgroup_change' bg.id %}"
+         target="_blank"
+         title="Configure">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             width="24"
+             height="24"
+             viewBox="0 0 24 24"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="2"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             class="lucide lucide-database">
+          <ellipse cx="12" cy="5" rx="9" ry="3" />
+          <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+          <path d="M3 12A9 3 0 0 0 21 12" />
+        </svg>
+      </a>
+    </div>
+    <div class="flex flex-wrap gap-4">
+      {% for b in bg.bots.all %}
+        <div class="{{ b.health }} w-fit rounded-lg p-2 flex flex-col gap-1">
+          <p>
+            <a href="{{ b.get_log_url }}">{{ b.name }}</a> | <a href="{% url 'admin:app_bot_change' b.id %}" target="_blank">
+              <svg xmlns="http://www.w3.org/2000/svg"
+                   width="16"
+                   height="16"
+                   viewBox="0 0 24 24"
+                   fill="none"
+                   stroke="currentColor"
+                   stroke-width="2"
+                   stroke-linecap="round"
+                   stroke-linejoin="round"
+                   class="lucide lucide-database">
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+                <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+                <path d="M3 12A9 3 0 0 0 21 12" />
+              </svg>
+            </a>
+          </p>
+          <p>
+            <span><b>Balance: </b>{{ b.balance }} | </span>
+            <span><b>Conseq. losses: </b>{{ b.conseq_losses }}</span>
+          </p>
+          {% with orders=b.order_set.all %}
+            {% if orders %}
+              <p>
+                <b>Last order:</b>
+                <a href="{% url 'admin:app_order_change' orders.last.id %}"
+                   target="_blank">{{ orders.last.id }}</a>
+              </p>
+            {% endif %}
+          {% endwith %}
+          {% with log=b.log_set.last %}
+            {% if log and log.ltype == 'G' %}
+              <p>
+                <b>Last log: </b>{{ log.text }}
+              </p>
+            {% endif %}
+          {% endwith %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="overflow-y-auto code">
+      <code>
+        {% for l in logs %}
+          <p class="mb-1">
+            <b>[+] {{ l.timestamp|date:"d/m/y H:i:s" }} {{ l.bot }}
+              {% if l.origin %}{{ l.origin }}{% endif %}
+            : </b>
+            <span>{{ l.text }}</span>
+          </p>
+        {% endfor %}
+      </code>
+    </div>
+  </div>
+{% endblock content %}

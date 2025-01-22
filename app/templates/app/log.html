@@ -1,0 +1,49 @@
+{% extends "index.html" %}
+{% block content %}
+  <div class="flex flex-col gap-4">
+    <div class="flex gap-2">
+      <b>{{ bot.name }}</b>
+      <a href="{% url 'admin:app_bot_change' bot.id %}" target="_blank">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             width="16"
+             height="16"
+             viewBox="0 0 24 24"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="2"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             class="lucide lucide-database">
+          <ellipse cx="12" cy="5" rx="9" ry="3" />
+          <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+          <path d="M3 12A9 3 0 0 0 21 12" />
+        </svg>
+      </a>
+    </div>
+    <div class="flex gap-4">
+      <span><b>Conseq.losses: </b>{{ bot.conseq_losses }}</span>
+      <span><b>Balance: </b>{{ bot.balance|floatformat:2 }}</span>
+      {% with orders=bot.order_set.all %}
+        {% if orders %}
+          <span><b>Orders:</b>
+            {% for order in orders %}
+              <a href="{% url 'admin:app_order_change' order.id %}" target="_blank">{{ order.id }}</a>
+            {% endfor %}
+          </span>
+        {% endif %}
+      {% endwith %}
+    </div>
+    <div class="overflow-y-auto code">
+      <code>
+        {% for l in logs %}
+          <p class="mb-1">
+            <b>[+] {{ l.timestamp|date:"d/m/y H:i:s" }}
+              {% if l.origin %}{{ l.origin }}{% endif %}
+            :</b>
+            <span>{{ l.text }}</span>
+          </p>
+        {% endfor %}
+      </code>
+    </div>
+  </div>
+{% endblock content %}

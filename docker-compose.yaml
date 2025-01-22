@@ -1,0 +1,73 @@
+services:
+
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    networks:
+      - traider
+    environment:
+      - POSTGRES_DB=${TRAIDER_POSTGRES_DB:-traiderdb}
+      - POSTGRES_USER=${TRAIDER_POSTGRES_USER:-traiderdbuser}
+      - POSTGRES_PASSWORD=${TRAIDER_POSTGRES_PASSWORD:-traiderdbpassword}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  broker:
+    image: rabbitmq:4
+    hostname: "rabbitmq"
+    networks:
+      - traider
+    environment:
+      RABBITMQ_DEFAULT_USER: "rabbitmq"
+      RABBITMQ_DEFAULT_PASS: "rabbitmq"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+  app:
+    build: .
+    restart: unless-stopped
+    networks:
+      traider:
+        aliases:
+          - traider
+    ports:
+      - "8000:8000"
+    environment:
+      - TRAIDER_DB_HOST=${TRAIDER_POSTGRES_HOST:-db}
+      - TRAIDER_DB=${TRAIDER_POSTGRES_DB:-traiderdb}
+      - TRAIDER_DB_USER=${TRAIDER_POSTGRES_USER:-traiderdbuser}
+      - TRAIDER_DB_PASSWORD=${TRAIDER_POSTGRES_PASSWORD:-traiderdbpassword}
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - broker
+
+  tasks:
+    build: .
+    command: celery -A app worker --beat -P solo --loglevel=warning
+    restart: unless-stopped
+    networks:
+      traider:
+        aliases:
+          - traider
+    environment:
+      - TRAIDER_DB_HOST=${TRAIDER_POSTGRES_HOST:-db}
+      - TRAIDER_DB=${TRAIDER_POSTGRES_DB:-traiderdb}
+      - TRAIDER_DB_USER=${TRAIDER_POSTGRES_USER:-traiderdbuser}
+      - TRAIDER_DB_PASSWORD=${TRAIDER_POSTGRES_PASSWORD:-traiderdbpassword}
+      - CELERY_BROKER_URL=amqp://rabbitmq:rabbitmq@broker:5672//
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - broker
+
+
+networks:
+  traider:
+
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
