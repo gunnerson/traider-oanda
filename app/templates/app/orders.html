@@ -8,7 +8,6 @@
           <th class="text-center">N</th>
           <th class="text-center">Instrument</th>
           <th class="text-center">Type</th>
-          <th class="text-center">Interval</th>
           <th class="text-center">Open</th>
           <th class="text-center">Close</th>
           <th class="text-center">RVR</th>
@@ -25,7 +24,6 @@
               <a href="{% url 'admin:app_bot_change' order.bot.id %}" target="_blank">&nbsp;&nbsp;&nbsp;{{ order.bot.pair.base.name }}&nbsp;&nbsp;&nbsp;</a>
             </td>
             <td class="text-center">{{ order.get_order_dir_display }}</td>
-            <td class="text-center">{{ order.get_interval_display }}</td>
             <td class="text-center">{{ order.opentm|date:"m/d D H:i" }}</td>
             <td class="text-center">{{ order.closetm|date:"D H:i" }}</td>
             <td class="text-center">{{ order.rvr }}</td>
@@ -38,7 +36,6 @@
           <td class="text-center font-bold">
             WON: <span class="text-{% if pr %}green-700{% else %}red-700{% endif %}">{{ ww }}%</span> / <span class="font-bold">{{ a }}</span>
           </td>
-          <td></td>
           <td></td>
           <td></td>
           <td></td>

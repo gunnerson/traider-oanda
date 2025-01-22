@@ -1,6 +1,6 @@
 psycopg2-binary==2.9.*
 Django==5.0.*
-celery[redis]==5.3.*
+celery==5.3.*
 pandas==2.2.*
 plotly==5.19.*
 django-plotly-dash==2.3.*

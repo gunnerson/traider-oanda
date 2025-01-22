@@ -185,7 +185,7 @@ class Bot(models.Model):
     def add_bots(cls):
         pairs = Pair.objects.all()
         for p in pairs:
-            bot, created = cls.objects.get_or_create(pair=p)
+            bot, _ = cls.objects.get_or_create(pair=p)
             print(f"[+] Bot {bot.pair.name} created...")
 
     def get_log_url(self):

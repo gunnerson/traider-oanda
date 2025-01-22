@@ -51,37 +51,35 @@ class Api:
         if method == enums.Method.GET:
             url += self.get_query(params)
 
-        for n in range(1, 4):
-            try:
-                if method == enums.Method.GET:
-                    response = self.session.request(
-                        method.value,
-                        url,
-                        timeout=self.timeout,
-                    )
-                else:
-                    response = self.session.request(
-                        method.value,
-                        url,
-                        data=json.dumps(params),
-                        timeout=self.timeout,
-                    )
-            except (ConnectionError, ReadTimeout):
-                print(
-                    f"[-] OANDA-API endpoint '{endpoint}' returned with error 'ConnectionError'. Trying again in {n} seconds..."
+        try:
+            if method == enums.Method.GET:
+                response = self.session.request(
+                    method.value,
+                    url,
+                    timeout=self.timeout,
                 )
-                time.sleep(n)
-                continue
-
-            if response.status_code in [400, 401, 403, 404, 405]:
-                res = json.loads(response.text)
-                print(
-                    f"[-] OANDA-API endpoint '{endpoint}' returned with error code '{response.status_code}'({response.reason}): {res["errorMessage"]}"
+            else:
+                response = self.session.request(
+                    method.value,
+                    url,
+                    data=json.dumps(params),
+                    timeout=self.timeout,
                 )
-                return None
+        except (ConnectionError, ReadTimeout):
+            print(
+                f"[-] OANDA-API endpoint '{endpoint}' returned with error 'ConnectionError'."
+            )
+            return None
 
-            if response.status_code in [200, 201]:
-                return response.json()
+        if response.status_code in [400, 401, 403, 404, 405]:
+            res = json.loads(response.text)
+            print(
+                f"[-] OANDA-API endpoint '{endpoint}' returned with error code '{response.status_code}'({response.reason}): {res["errorMessage"]}"
+            )
+            return None
+
+        if response.status_code in [200, 201]:
+            return response.json()
 
         print(f"[-] OANDA-API endpoint '{endpoint}' failed to fetch data...")
         return None

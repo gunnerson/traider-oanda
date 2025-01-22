@@ -45,8 +45,7 @@
 1. Setup virtual environment and install dependencies  
     `python -m venv venv && source venv/ve/activate && pip install -r requirements.txt`
 2. Setup a [broker](https://docs.celeryq.dev/en/stable/getting-started/backends-and-brokers/index.html). The default one is RabbitMQ:
-    - Install using the [appropriate method](https://www.rabbitmq.com/docs/download) for your environment. For example, on Arch Linux:  
-        `sudo pacman -S rabbitmq`
+    - Install using the [appropriate method](https://www.rabbitmq.com/docs/download) for your environment.
     - Start the server:  
         `sudo rabbitmq-server -detached`
 3. Set necessary environment varibles. Example:
@@ -55,6 +54,7 @@
     export TRAIDER_OANDA_API="12345"
     export TRAIDER_OANDA_SECRET="yourapisecret"
     export TRAIDER_OANDA_BASE_URL="https://api-fxtrade.oanda.com/v3/"
+    ~~~
 
 4. Apply migrations  
     `python manage.py migrate`
@@ -109,7 +109,8 @@
         [2025-01-07 16:27:15,963: INFO/Beat] Scheduler: Sending due task run_bots (app.tasks.run_bots)
         [2025-01-07 16:27:15,966: INFO/MainProcess] Task app.tasks.run_bots[0ce88f9e-d5f9-4259-a9c5-826009a46b0d] received
         [2025-01-07 16:27:16,039: INFO/MainProcess] Task app.tasks.run_bots[0ce88f9e-d5f9-4259-a9c5-826009a46b0d] succeeded in 0.07253211199713405s: None
-        ~~~
+    ~~~
+
     You can change `loglevel` to `warning` at this point for less verbosity.
 
 9. For long-term deployment consider [setting up](https://wiki.archlinux.org/title/Systemd) _systemd_ services for _Celery_, _Django_ and the broker.

@@ -195,6 +195,7 @@ LOGGING = {
 CELERY_BROKER_URL = os.environ.get(
     f"{APP_NAME}_CELERY_BROKER_URL", "amqp://guest:guest@localhost:5672//"
 )
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 
 # API Keys
