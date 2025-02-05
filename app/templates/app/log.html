@@ -37,9 +37,7 @@
       <code>
         {% for l in logs %}
           <p class="mb-1">
-            <b>[+] {{ l.timestamp|date:"d/m/y H:i:s" }}
-              {% if l.origin %}{{ l.origin }}{% endif %}
-            :</b>
+            <b>[+] {{ l.timestamp|date:"d/m/y H:i:s" }}: </b>
             <span>{{ l.text }}</span>
           </p>
         {% endfor %}

@@ -21,12 +21,13 @@ class OrderDir(models.TextChoices):
 class OrderType(models.TextChoices):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
+    STOP_LOSS = "STOP_LOSS"
     TRAILING_STOP_LOSS = "TRAILING_STOP_LOSS"
 
 
 class CloseStatus(models.TextChoices):
-    STOPPED = "S"
-    TOUCHED = "T"
+    PROFIT = "P"
+    LOSS = "L"
 
 
 class OrderStatus(models.TextChoices):

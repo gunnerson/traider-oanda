@@ -1,22 +1,13 @@
 def candle_is_bullish(df):
-
     o1, h1, l1, c1 = df.iloc[-2, 1:5].to_numpy()
     o2, h2, l2, c2 = df.iloc[-1, 1:5].to_numpy()
 
-    mid = l2 + ((h2 - l2) * 0.75)
-    if o2 < mid and c2 < mid:
-        return False
-
-    # if c2 != h2:
-    #     return False
-
-    if c2 > o2:
-
+    if c2 == h2:
         if c2 > h1:
             return True
 
-        if (c2 - o2) > abs(o1 - c1):
-            return True
+        # if (c2 - l2) > abs(o1 - c1):
+        #     return True
 
         # if o2 > mid and (h2 - l2) >= (h1 - l1):
         #     return True
@@ -25,24 +16,15 @@ def candle_is_bullish(df):
 
 
 def candle_is_bearish(df):
-
     o1, h1, l1, c1 = df.iloc[-2, 1:5].to_numpy()
     o2, h2, l2, c2 = df.iloc[-1, 1:5].to_numpy()
 
-    mid = h2 - ((h2 - l2) * 0.75)
-    if o2 > mid and c2 > mid:
-        return False
-
-    # if c2 != l2:
-    #     return False
-
-    if c2 < o2:
-
+    if c2 == l2:
         if c2 < l1:
             return True
 
-        if (o2 - c2) > abs(o1 - c1):
-            return True
+        # if (h2 - c2) > abs(o1 - c1):
+        #     return True
 
         # if o2 < mid and (h2 - l2) >= (h1 - l1):
         #     return True

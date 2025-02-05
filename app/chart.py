@@ -10,8 +10,10 @@ from django.db.utils import OperationalError, ProgrammingError
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 
+from app import enums
+
 from .api import get_ohlc_data
-from .enums import CloseStatus, Interval, OrderDir
+from .enums import Interval, OrderDir
 from .models import Bot, Order, Pair
 from .utils import get_ohlc_analysis, prep_data
 
@@ -98,7 +100,6 @@ kc_app.layout = html.Div(  # type: ignore
                     placeholder="Trigger Price",
                     debounce=True,
                     inputMode="numeric",
-                    required=True,
                     style={"width": "8rem", "border": "1px dashed gray"},
                 ),
                 dcc.Input(
@@ -279,25 +280,25 @@ def update_figure(data, height, pair, interval):
         )
     )
 
-    fig.add_trace(
-        go.Scatter(
-            x=df["Date"],
-            y=df["BBH"],
-            name="BBH",
-            line=dict(color=MAVG_COLOR),
-            opacity=0.5,
-        )
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=df["Date"],
-            y=df["BBL"],
-            name="BBL",
-            line=dict(color=MAVG_COLOR),
-            opacity=0.5,
-        )
-    )
+    # fig.add_trace(
+    #     go.Scatter(
+    #         x=df["Date"],
+    #         y=df["BBH"],
+    #         name="BBH",
+    #         line=dict(color=MAVG_COLOR),
+    #         opacity=0.5,
+    #     )
+    # )
+    #
+    # fig.add_trace(
+    #     go.Scatter(
+    #         x=df["Date"],
+    #         y=df["BBL"],
+    #         name="BBL",
+    #         line=dict(color=MAVG_COLOR),
+    #         opacity=0.5,
+    #     )
+    # )
 
     fig.add_trace(
         go.Scatter(
@@ -376,7 +377,8 @@ def update_figure(data, height, pair, interval):
 )
 def init_order_form(pair_name):
     pair = Pair.objects.get(name=pair_name)
-    return [None for _ in range(6)] + [pair.ordermin for _ in range(2)]
+    price_min = 10 ** (-1 * pair.cost_decimals)
+    return [price_min for _ in range(4)] + [pair.ordermin for _ in range(2)]
 
 
 @kc_app.callback(
@@ -409,14 +411,15 @@ def set_order_values(
     data,
 ):
     pair = Pair.objects.get(name=pair_name)
-    if submit and price:
+    if submit:
         order = Order(
             bot=pair.bot,  # type: ignore
             order_dir=order_dir,
-            price=round(price, pair.cost_decimals),
         )
-        if stopprice:
-            order.stopprice = round(stopprice, pair.cost_decimals)
+        if price:
+            order.price = round(price, pair.cost_decimals)
+            if stopprice:
+                order.stopprice = round(stopprice, pair.cost_decimals)
         if vol:
             order.vol = round(vol, pair.lot_decimals)
         order.save()
@@ -453,11 +456,15 @@ def _get_orders(pair, since):
             )
             opentm = order.opentm.astimezone(pytz.timezone(settings.TIME_ZONE))
             order_target.append([opentm, opentm, close, close, opentm])
-            if order.closeprice and order.close_status == CloseStatus.TOUCHED:
-                target = order.closeprice
-            else:
-                target = order.price
-            order_target.append([target, order.price, order.price, target, target])
+            order_target.append(
+                [
+                    order.tpprice,
+                    order.price,
+                    order.price,
+                    order.tpprice,
+                    order.tpprice,
+                ]
+            )
             order_stop.append([opentm, opentm, close, close, opentm])
             order_stop.append(
                 [

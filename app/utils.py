@@ -2,15 +2,15 @@ import numpy as np
 import pandas as pd
 from django.conf import settings
 
+from . import indicators
 from .candles import *
-from .indicators import *
 from .patterns import *
 from .ta import *
 
 
 def prep_data(data: dict, smooth=False) -> dict:
     df = pd.DataFrame([{**x, **x.pop("mid")} for x in data["ohlc"]])
-    df.drop(df.columns[[0, 1, 3]], axis=1, inplace=True)  # type: ignore
+    df.drop(df.columns[[0, 3]], axis=1, inplace=True)  # type: ignore
     df.rename(
         columns={
             "time": "Date",
@@ -18,6 +18,7 @@ def prep_data(data: dict, smooth=False) -> dict:
             "h": "High",
             "l": "Low",
             "c": "Close",
+            "volume": "Volume",
         },
         inplace=True,
     )
@@ -29,6 +30,7 @@ def prep_data(data: dict, smooth=False) -> dict:
             "High": "float",
             "Low": "float",
             "Close": "float",
+            "Volume": "int",
         }
     )
     df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
@@ -41,7 +43,7 @@ def prep_data(data: dict, smooth=False) -> dict:
         df.Low = df[["Open", "Close", "Low"]].min(axis=1)
 
     # Merge last two candles together
-    df = _smooth_last(df)
+    # df = _smooth_last(df)
 
     return {
         "df": df,
@@ -53,9 +55,8 @@ def get_ohlc_analysis(data: dict, trend=True, vz=True):
     df: pd.DataFrame = data["df"]  # type: ignore
 
     # Get Indicators
-    df = get_ema(df)
-    df = get_atr(df)
-    df = bollinger_bands(df)
+    df = indicators.get_ema(df)
+    df = indicators.get_atr(df)
 
     # Identify trend
     if trend:

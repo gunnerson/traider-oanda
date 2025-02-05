@@ -81,8 +81,14 @@ def get_trend(df: pd.DataFrame):
     df3.loc[:, "D"] = df3.BP.diff() > 0  # type: ignore
     g = df3.groupby(df3[["D"]].ne(df3[["D"]].shift()).any(axis=1).cumsum())  # type: ignore
     df.loc[~df["Date"].isin(g["Date"].last()), ["UpT", "DnT"]] = False
-    df.loc[df3.index[0], "UpT"] = df.loc[df3.index[0], "HH"]  # type: ignore
-    df.loc[df3.index[0], "DnT"] = df.loc[df3.index[0], "LL"]  # type: ignore
+    try:
+        df.loc[df3.index[0], "UpT"] = df.loc[df3.index[0], "HH"]  # type: ignore
+    except IndexError:
+        pass
+    try:
+        df.loc[df3.index[0], "DnT"] = df.loc[df3.index[0], "LL"]  # type: ignore
+    except IndexError:
+        pass
 
     # Find swings height "MSH"
     df2 = df[df.UpT | df.DnT].copy()

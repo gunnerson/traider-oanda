@@ -21,7 +21,7 @@
               <a href="{% url 'admin:app_order_change' order.id %}" target="_blank">&nbsp;&nbsp;&nbsp;{{ order.id }}&nbsp;&nbsp;&nbsp;</a>
             </td>
             <td class="text-center">
-              <a href="{% url 'admin:app_bot_change' order.bot.id %}" target="_blank">&nbsp;&nbsp;&nbsp;{{ order.bot.pair.base.name }}&nbsp;&nbsp;&nbsp;</a>
+              <a href="{% url 'admin:app_bot_change' order.bot.id %}" target="_blank">&nbsp;&nbsp;&nbsp;{{ order.bot.pair.altname }}&nbsp;&nbsp;&nbsp;</a>
             </td>
             <td class="text-center">{{ order.get_order_dir_display }}</td>
             <td class="text-center">{{ order.opentm|date:"m/d D H:i" }}</td>

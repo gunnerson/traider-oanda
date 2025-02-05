@@ -106,7 +106,7 @@
             {% endif %}
           {% endwith %}
           {% with log=b.log_set.last %}
-            {% if log and log.ltype == 'G' %}
+            {% if log %}
               <p>
                 <b>Last log: </b>{{ log.text }}
               </p>
@@ -115,13 +115,11 @@
         </div>
       {% endfor %}
     </div>
-    <div class="overflow-y-auto code">
+    <div class="code">
       <code>
         {% for l in logs %}
           <p class="mb-1">
-            <b>[+] {{ l.timestamp|date:"d/m/y H:i:s" }} {{ l.bot }}
-              {% if l.origin %}{{ l.origin }}{% endif %}
-            : </b>
+            <b>[+] {{ l.timestamp|date:"d/m/y H:i:s" }} {{ l.bot }}: </b>
             <span>{{ l.text }}</span>
           </p>
         {% endfor %}

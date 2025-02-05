@@ -76,12 +76,15 @@ class Api:
             print(
                 f"[-] OANDA-API endpoint '{endpoint}' returned with error code '{response.status_code}'({response.reason}): {res["errorMessage"]}"
             )
+            print(json.dumps(params))
             return None
 
         if response.status_code in [200, 201]:
             return response.json()
 
-        print(f"[-] OANDA-API endpoint '{endpoint}' failed to fetch data...")
+        print(
+            f"[-] OANDA-API endpoint '{endpoint}' returned with error code '{response.status_code}'({response.reason})"
+        )
         return None
 
 
@@ -134,34 +137,45 @@ class Endpoint:
 
     def place_order(
         self,
-        order_type: enums.OrderType,
         pair: str | None = None,
         vol: int | float | None = None,
         price: float | None = None,
         trade_id: str | None = None,
         distance: int | float | None = None,
+        stopprice: float | None = None,
     ) -> dict:
-        if order_type == enums.OrderType.MARKET:
-            params = {
-                "order": {
-                    "type": order_type,
-                    "instrument": pair,
-                    "units": str(vol),
-                    "priceBound": str(price),
-                }
+        params = {
+            "order": {
+                "type": enums.OrderType.MARKET,
+                "instrument": pair,
+                "units": str(vol),
+                "priceBound": str(price),
+                "stopLossOnFill": {"price": str(stopprice)},
             }
-        elif order_type == enums.OrderType.TRAILING_STOP_LOSS:
-            params = {
-                "order": {
-                    "type": order_type,
-                    "tradeID": trade_id,
-                    "distance": str(distance),
-                }
-            }
+        }
         return self.api.send_request(
             enums.Method.POST,
             f"accounts/{self.api.api_account}/orders",
             params,  # type: ignore
+        )
+
+    def change_order(
+        self,
+        distance: float,
+        order_id: str,
+        trade_id: str,
+    ) -> dict:
+        params = {
+            "order": {
+                "distance": str(distance),
+                "type": enums.OrderType.TRAILING_STOP_LOSS,
+                "tradeID": trade_id,
+            }
+        }
+        return self.api.send_request(
+            enums.Method.PUT,
+            f"accounts/{self.api.api_account}/orders/{order_id}",
+            params,
         )
 
     def get_order(

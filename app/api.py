@@ -53,18 +53,19 @@ def open_position(
     pair: str,
     vol: int | float,
     price: float,
+    stopprice: float,
     order_dir: enums.OrderDir,
 ) -> dict:
     vol = vol if order_dir == enums.OrderDir.LONG else -1 * vol
     if data := api.place_order(
-        order_type=enums.OrderType.MARKET,
         pair=pair,
         vol=vol,
         price=price,
+        stopprice=stopprice,
     ):
         try:
             return {
-                "order_id": data["orderCreateTransaction"]["id"],
+                "sl_id": data["relatedTransactionIDs"][-1],
                 "trade_id": data["orderFillTransaction"]["tradeOpened"]["tradeID"],
                 "price": float(data["orderFillTransaction"]["price"]),
                 "time": datetime.fromtimestamp(
@@ -77,17 +78,18 @@ def open_position(
     return {}
 
 
-def open_stop_loss(
-    trade_id: str,
+def adjust_stop_loss(
     distance: float,
-) -> bool:
-    if api.place_order(
-        order_type=enums.OrderType.TRAILING_STOP_LOSS,
-        trade_id=trade_id,
-        distance=distance,
+    sl_id: str,
+    trade_id: str,
+) -> str:
+    if data := api.change_order(
+        distance,
+        sl_id,
+        trade_id,
     ):
-        return True
-    return False
+        return data["orderCreateTransaction"]["id"]
+    return ""
 
 
 def get_trade(trade_id: str) -> dict:

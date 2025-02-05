@@ -62,10 +62,10 @@ class Pair(models.Model):
     def add_pairs(cls):
         pair_list = api.get_instruments()
         for pair in pair_list:
-            base, created = Asset.objects.get_or_create(
+            base, _ = Asset.objects.get_or_create(
                 name=pair["displayName"].split("/")[0]
             )
-            quote, created = Asset.objects.get_or_create(
+            quote, _ = Asset.objects.get_or_create(
                 name=pair["displayName"].split("/")[1]
             )
             max_leverage = int(1 / float(pair["marginRate"]))
@@ -101,6 +101,10 @@ class Order(models.Model):
     stopprice = models.FloatField(
         null=True, blank=True, verbose_name="Stop-loss trigger price"
     )
+    tpprice = models.FloatField(
+        null=True, blank=True, verbose_name="Target take-profit price"
+    )
+
     vol = models.FloatField(null=True, blank=True, verbose_name="Volume")
     opentm = models.DateTimeField(default=timezone.now, verbose_name="Open time")
     closetm = models.DateTimeField(null=True, blank=True, verbose_name="Close time")
@@ -109,9 +113,14 @@ class Order(models.Model):
     status = models.CharField(max_length=9, choices=enums.OrderStatus, blank=True)  # type: ignore
     close_status = models.CharField(max_length=1, choices=enums.CloseStatus, blank=True)  # type: ignore
     rvr = models.FloatField(null=True, blank=True, verbose_name="Risk vs Reward")
-    order_id = models.CharField(max_length=24, blank=True, verbose_name="Order ID")
     trade_id = models.CharField(max_length=24, blank=True, verbose_name="Trade ID")
-    limitprice: float  # Price for limit order or market bound price
+    sl_id = models.CharField(max_length=24, blank=True, verbose_name="Stop-loss ID")
+    limitprice: float | None = None  # Price for limit order or market bound price
+    trailprice: float  # Trailing stop triger price
+    stoplimitprice: float  # Trailing stop limit price
+    mstopprice: float  # Max/min stop-loss price
+    mtpprice: float  # Max/min take-profit price
+    leverage: int
 
     class Meta:
         ordering = ["-pk"]
@@ -127,31 +136,33 @@ class Order(models.Model):
             name += " x" + str(self.vol)
         return name
 
-    def get_stop_buffer(self) -> float:
-        return round_down(
-            abs(self.price - self.stopprice) if self.stopprice else 0,
+    @property
+    def k(self):
+        return 1 if self.order_dir == enums.OrderDir.LONG else -1
+
+    def get_rvr(self) -> float:
+        k = 1 if self.close_status == enums.CloseStatus.PROFIT else -1
+        target = self.closeprice if self.closeprice else self.tpprice
+        return k * round(abs(target - self.price) / abs(self.price - self.stopprice), 1)
+
+    def get_trail_buffer(self) -> float:
+        return round(
+            abs(self.price - self.stopprice) * self.bot.bg.trail_multiplier,
             self.bot.pair.cost_decimals,
         )
 
-    def get_rvr(self) -> float:
-        if self.closeprice:
-            return round_down(
-                abs(self.closeprice - self.price) / self.get_stop_buffer(), 1
-            )
-        return 0
-
     def get_close_status(self):
         if self.stopprice and self.closeprice:
-            if self.price > self.stopprice:
+            if self.order_dir == enums.OrderDir.LONG:
                 if self.closeprice > self.price:
-                    return enums.CloseStatus.TOUCHED
+                    return enums.CloseStatus.PROFIT
                 else:
-                    return enums.CloseStatus.STOPPED
+                    return enums.CloseStatus.LOSS
             else:
                 if self.closeprice < self.price:
-                    return enums.CloseStatus.TOUCHED
+                    return enums.CloseStatus.PROFIT
                 else:
-                    return enums.CloseStatus.STOPPED
+                    return enums.CloseStatus.LOSS
 
 
 class Bot(models.Model):
@@ -251,30 +262,26 @@ class Bot(models.Model):
     def _get_data(
         self,
         i: enums.Interval,
-        analyze=True,
         valid=True,
         simple=False,
-        short=False,
     ):
         # Return cached data if it's not too old
-        if valid and self._data_is_valid(i):
+        if self._data_is_valid(i) and valid:
             return self.data[i]
 
-        count = 100 if short else 500
+        count = 100 if simple else 500
 
         if api_data := api.get_ohlc_data(
             self.pair.name, enums.Interval(i).label, count=count
         ):
             prepped_data = utils.prep_data(api_data, smooth=self.bg.smooth)
-            self.data[i]["last"] = datetime.now()
-            if analyze:
-                self.data[i] = self.data[i] | utils.get_ohlc_analysis(prepped_data)
-            elif simple:
+            if simple:
                 self.data[i] = self.data[i] | utils.get_ohlc_analysis(
                     prepped_data, vz=False
                 )
             else:
-                self.data[i] = self.data[i] | prepped_data
+                self.data[i] = self.data[i] | utils.get_ohlc_analysis(prepped_data)
+            self.data[i]["last"] = datetime.now()
             return self.data[i]
 
         return {}
@@ -293,49 +300,84 @@ class Bot(models.Model):
         return True
 
     def _analyze(self):
-        if data := self._get_data(self.bg.interval_long, simple=True):
-            if long_trend := patterns.get_long_trend(data["df"]):
-                if data := self._get_data(self.bg.interval_short, simple=True):
+        if data := self._get_data(self.bg.interval_long):
+            if long_trend := patterns.get_long_trend(data):
+                if data := self._get_data(self.bg.interval_short):
                     df = data["df"]
-                    if short_trend := patterns.get_short_trend(df):
-                        if long_trend != short_trend and self._get_pricing():
-                            price = (
-                                self.ask_price
-                                if short_trend == enums.OrderDir.LONG
-                                else self.bid_price
-                            )
+                    if order := patterns.get_short_trend(df):
+                        if long_trend == order["order_dir"] and self._get_pricing():
                             self.order = Order(
                                 bot=self,
-                                order_dir=short_trend,
-                                price=price,
+                                order_dir=order["order_dir"],
                             )
+                            self.order.mstopprice = order["stopprice"]
+                            self.order.mtpprice = order["tpprice"]
                             self._process_order(df)
 
     def _process_order(self, df=None):
         if df is None:
             data = self._get_data(
-                self.bg.interval_short, valid=False, simple=True, short=True
+                self.bg.interval_short,
+                valid=False,
+                simple=True,
             )
             if not data:
                 return
             df = data["df"]
 
-        ATR = df.ATR.iloc[-2]
-        k = 1 if self.order.order_dir == enums.OrderDir.LONG else -1
+        ATR = df.ATR.iloc[-2] * self.order.k
 
-        if self.order.order_dir == enums.OrderDir.LONG:
-            k = 1
-            price = self.bid_price
-        else:
-            k = -1
-            price = self.ask_price
+        if not self.order.price:
+            self.order.price = (
+                self.ask_price
+                if self.order.order_dir == enums.OrderDir.LONG
+                else self.bid_price
+            )
+
+        if not self.order.limitprice:
+            self.order.limitprice = round(
+                self.order.price + ATR * self.bg.limit_multiplier,
+                self.pair.cost_decimals,
+            )
+
+        price = (
+            self.bid_price
+            if self.order.order_dir == enums.OrderDir.LONG
+            else self.ask_price
+        )
+        self.order.trailprice = round(
+            price - ATR * self.bg.buffer_multiplier, self.pair.cost_decimals
+        )
 
         if not self.order.stopprice:
-            self.order.stopprice = price - k * ATR * self.bg.buffer_multiplier
+            foo = max if self.order.order_dir == enums.OrderDir.LONG else min
+            self.order.stopprice = (
+                foo(
+                    self.order.mstopprice,
+                    self.order.price - ATR * self.bg.buffer_multiplier,
+                )
+                if self.order.mstopprice
+                else self.order.trailprice
+            )
+            self.order.stopprice = round(self.order.stopprice, self.pair.cost_decimals)
 
-        self.order.limitprice = self.order.price + k * ATR * self.bg.limit_multiplier
+        if not self.order.tpprice:
+            self.order.tpprice = round(
+                self.order.price
+                + (self.order.price - self.order.stopprice) * self.bg.min_rvr,
+                self.pair.cost_decimals,
+            )
+            if (
+                self.order.order_dir == enums.OrderDir.LONG
+                and self.order.tpprice > self.order.mtpprice
+            ) or (
+                self.order.order_dir == enums.OrderDir.SHORT
+                and self.order.tpprice < self.order.mtpprice
+            ):
+                return
 
-        self._get_volume()
+        if not self.order.vol:
+            self._get_volume()
 
     def _get_volume(self):
         if self.bg.traiding_balance:
@@ -345,6 +387,10 @@ class Bot(models.Model):
             )
         else:
             available_margin = self.account_margin
+
+        if not self.bg.single:
+            available_margin *= self.bg.single_trade / 100
+
         if self.bg.min_order:
             self.order.vol = self.pair.ordermin
         elif not self.order.vol:
@@ -370,48 +416,57 @@ class Bot(models.Model):
         self._place_order()
 
     def _place_order(self):
-        self.order.price = round_down(self.order.price, self.pair.cost_decimals)
-        self.order.limitprice = round_down(
-            self.order.limitprice, self.pair.cost_decimals
-        )
-        self.order.stopprice = round_down(self.order.stopprice, self.pair.cost_decimals)
         if data := api.open_position(
             self.pair.name,
             self.order.vol,
-            self.order.limitprice,
+            self.order.limitprice,  # type:ignore
+            self.order.stopprice,
             self.order.order_dir,
         ):
-            self.order.order_id = data["order_id"]
             self.order.trade_id = data["trade_id"]
+            self.order.sl_id = data["sl_id"]
             self.order.price = data["price"]
             self.order.opentm = data["time"]
             self.order.rvr = self.order.get_rvr()
-            self.order.status = enums.OrderStatus.FILLED
+            self.order.status = enums.OrderStatus.PENDING
             self.order.save()
             self.pair.base.save()
             self.pair.quote.save()
             self.bg.ready = False
             self.log(f"Opened {self.order.order_dir} position")
-            self._open_stop_loss()
         else:
             self.log("Failed to place order")
 
-    def _open_stop_loss(self):
-        if api.open_stop_loss(
-            self.order.trade_id,
-            self.order.get_stop_buffer(),
-        ):
-            self.order.status = enums.OrderStatus.PENDING
-            self.order.save(update_fields=["status"])
-            self.log(f"Placed trailing stop")
+    def _adjust_stop_loss(self):
+        if self._get_pricing():
+            trail_buffer = self.order.get_trail_buffer()
+            if (
+                (
+                    self.order.order_dir == enums.OrderDir.LONG
+                    and self.bid_price > (self.order.tpprice + trail_buffer)
+                )
+                or (
+                    self.order.order_dir == enums.OrderDir.SHORT
+                    and self.ask_price < (self.order.tpprice - trail_buffer)
+                )
+                or not self.order.sl_id
+            ):
+                if api.adjust_stop_loss(
+                    trail_buffer,
+                    self.order.sl_id,
+                    self.order.trade_id,
+                ):
+                    self.order.save(update_fields=["status"])
+                    self.log(f"Placed trailing stop")
+                else:
+                    self.log(f"Failed to place trailing stop")
 
     def _check_order(self):
-        if self.order.status == enums.OrderStatus.FILLED:
-            self._open_stop_loss()
-        else:
-            if data := api.get_trade(self.order.trade_id):
-                if data["status"] == enums.OrderStatus.CLOSED:
-                    self._close_order(data)
+        if data := api.get_trade(self.order.trade_id):
+            if data["status"] == enums.OrderStatus.CLOSED:
+                self._close_order(data)
+            else:
+                self._adjust_stop_loss()
 
     def _close_order(self, data):
         self.order.closeprice = data["closeprice"]
@@ -424,19 +479,18 @@ class Bot(models.Model):
         self._add_balance()
 
     def _add_balance(self):
-        self.bg.balance = round_down(self.bg.balance + self.order.net, 2)
+        self.bg.balance = round(self.bg.balance + self.order.net, 2)
         self.bg.save(update_fields=["balance"])
         self.log(f"Position closed. Order's net is {self.order.net} USD")
 
-        if self.order.close_status == enums.CloseStatus.TOUCHED:
-            self.balance = round_down(self.balance + self.order.rvr, 1)
+        if self.order.close_status == enums.CloseStatus.PROFIT:
             self.conseq_losses = 0
             self.bg.conseq_losses = 0
         else:
-            self.balance = round_down(self.balance - self.order.rvr, 1)
             self.conseq_losses += 1
             self.bg.conseq_losses += 1
 
+        self.balance = round(self.balance + self.order.rvr, 1)
         self.save(update_fields=["balance", "conseq_losses"])
         self.bg.save(update_fields=["conseq_losses"])
 
@@ -457,13 +511,11 @@ class Bot(models.Model):
         if full:
             self.order_set.all().delete()  # type: ignore
 
-    def log(self, text, origin=None, ltype="G"):
+    def log(self, text):
         print(f"[!] {self} {text}...")
         Log.objects.create(
             bot=self,
             text=text,
-            origin=origin,
-            ltype=ltype,
         )
 
 
@@ -487,6 +539,11 @@ class BotGroup(models.Model):
         blank=True,
         verbose_name="Max. balance available for trading in home currency",
     )
+    single_trade = models.PositiveSmallIntegerField(
+        default=50,
+        verbose_name="Percentage of available margin to risk on a single trade",
+    )
+    min_rvr = models.FloatField(default=2, verbose_name="Minimum RvR to place order")
     balance = models.FloatField(default=0, verbose_name="Profit/loss in quote currency")
     max_conseq = models.PositiveSmallIntegerField(
         default=3, verbose_name="Maximum losses in a row before pair is shutdown"
@@ -499,6 +556,9 @@ class BotGroup(models.Model):
     )
     buffer_multiplier = models.FloatField(
         default=1, verbose_name="ATR multiplier for stop/loss"
+    )
+    trail_multiplier = models.FloatField(
+        default=0.3, verbose_name="ATR multiplier for trailing stop/loss"
     )
     limit_multiplier = models.FloatField(
         default=0.1, verbose_name="ATR multiplier for limit"
@@ -544,7 +604,7 @@ class BotGroup(models.Model):
     def reset(self, full=False):
         self.balance = 0
         self.conseq_losses = 0
-        self.on_status = True
+        self.on_status = False
         self.save(update_fields=["balance", "conseq_losses", "on_status"])
         if not self.bot_set:
             self.bot_set = self.bots.all()
@@ -571,8 +631,6 @@ class BotGroup(models.Model):
 class Log(models.Model):
     bot: Bot = models.ForeignKey(Bot, on_delete=models.CASCADE)  # type: ignore
     text = models.TextField()
-    origin = models.CharField(max_length=64, null=True, blank=True)
-    ltype = models.CharField(max_length=1, default="G")
     timestamp = models.DateTimeField(default=timezone.now)
 
     class Meta:

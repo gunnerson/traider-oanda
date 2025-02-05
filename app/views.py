@@ -90,8 +90,8 @@ def bot_reset(request, pk):
 
 def _get_orders_context():
     orders = Order.objects.filter(closeprice__isnull=False)
-    won = orders.filter(close_status=CloseStatus.TOUCHED)
-    lost = orders.filter(close_status=CloseStatus.STOPPED)
+    won = orders.filter(close_status=CloseStatus.PROFIT)
+    lost = orders.filter(close_status=CloseStatus.LOSS)
 
     a = orders.count()
     w = won.count()

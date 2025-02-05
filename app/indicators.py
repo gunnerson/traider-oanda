@@ -14,14 +14,20 @@ def get_atr(df: pd.DataFrame, period=14):
 
 
 def get_sma(df: pd.DataFrame, period=50):
-    """Add Simple Moving Average index as "MA" column."""
+    """Add Simple Price Moving Average index as "MA" column."""
     df["MA"] = df["Close"].rolling(period).mean()
     return df
 
 
 def get_ema(df: pd.DataFrame, period=50):
-    """Add Exponensial Moving Average index as "MA" column."""
+    """Add Exponensial Price Moving Average index as "MA" column."""
     df["MA"] = df["Close"].ewm(span=period, adjust=False).mean()
+    return df
+
+
+def get_vma(df: pd.DataFrame, period=50):
+    """Add Exponensial Volume Moving Average index as "VMA" column."""
+    df["VMA"] = df["Volume"].ewm(span=period, adjust=False).mean()
     return df
 
 
