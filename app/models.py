@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 
 import pytz
+import requests
+from django.conf import settings
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -117,9 +119,6 @@ class Order(models.Model):
     sl_id = models.CharField(max_length=24, blank=True, verbose_name="Stop-loss ID")
     limitprice: float | None = None  # Price for limit order or market bound price
     trailprice: float  # Trailing stop triger price
-    stoplimitprice: float  # Trailing stop limit price
-    mstopprice: float  # Max/min stop-loss price
-    mtpprice: float  # Max/min take-profit price
     leverage: int
 
     class Meta:
@@ -212,15 +211,15 @@ class Bot(models.Model):
     @property
     def health(self):
         if not self.on_status:
-            return enums.BotHealth.STOPPED.value
+            return enums.BotHealth.STOPPED
         elif self.order:
-            return enums.BotHealth.PENDING.value
+            return enums.BotHealth.PENDING
         elif self.balance > 0:
-            return enums.BotHealth.PROFITABLE.value
+            return enums.BotHealth.PROFITABLE
         elif self.balance < 0:
-            return enums.BotHealth.UNPROFITABLE.value
+            return enums.BotHealth.UNPROFITABLE
         else:
-            return enums.BotHealth.OTHER.value
+            return enums.BotHealth.OTHER
 
     def open_order(self):
         return self.order_set.filter(closeprice=None).last()  # type: ignore
@@ -310,8 +309,6 @@ class Bot(models.Model):
                                 bot=self,
                                 order_dir=order["order_dir"],
                             )
-                            self.order.mstopprice = order["stopprice"]
-                            self.order.mtpprice = order["tpprice"]
                             self._process_order(df)
 
     def _process_order(self, df=None):
@@ -336,7 +333,8 @@ class Bot(models.Model):
 
         if not self.order.limitprice:
             self.order.limitprice = round(
-                self.order.price + ATR * self.bg.limit_multiplier,
+                self.order.price
+                + self.order.k * self.pair.pip * self.bg.limit_multiplier,
                 self.pair.cost_decimals,
             )
 
@@ -350,16 +348,7 @@ class Bot(models.Model):
         )
 
         if not self.order.stopprice:
-            foo = max if self.order.order_dir == enums.OrderDir.LONG else min
-            self.order.stopprice = (
-                foo(
-                    self.order.mstopprice,
-                    self.order.price - ATR * self.bg.buffer_multiplier,
-                )
-                if self.order.mstopprice
-                else self.order.trailprice
-            )
-            self.order.stopprice = round(self.order.stopprice, self.pair.cost_decimals)
+            self.order.stopprice = self.order.trailprice
 
         if not self.order.tpprice:
             self.order.tpprice = round(
@@ -367,14 +356,6 @@ class Bot(models.Model):
                 + (self.order.price - self.order.stopprice) * self.bg.min_rvr,
                 self.pair.cost_decimals,
             )
-            if (
-                self.order.order_dir == enums.OrderDir.LONG
-                and self.order.tpprice > self.order.mtpprice
-            ) or (
-                self.order.order_dir == enums.OrderDir.SHORT
-                and self.order.tpprice < self.order.mtpprice
-            ):
-                return
 
         if not self.order.vol:
             self._get_volume()
@@ -433,7 +414,7 @@ class Bot(models.Model):
             self.pair.base.save()
             self.pair.quote.save()
             self.bg.ready = False
-            self.log(f"Opened {self.order.order_dir} position")
+            self.log(f"Opened {self.order.order_dir} position", True)
         else:
             self.log("Failed to place order")
 
@@ -453,25 +434,26 @@ class Bot(models.Model):
             ):
                 if api.adjust_stop_loss(
                     trail_buffer,
-                    self.order.sl_id,
                     self.order.trade_id,
                 ):
+                    self.order.status = enums.OrderStatus.TRAILING
                     self.order.save(update_fields=["status"])
-                    self.log(f"Placed trailing stop")
+                    self.log("Placed trailing stop")
                 else:
-                    self.log(f"Failed to place trailing stop")
+                    self.log("Failed to place trailing stop")
 
     def _check_order(self):
         if data := api.get_trade(self.order.trade_id):
             if data["status"] == enums.OrderStatus.CLOSED:
                 self._close_order(data)
-            else:
+            elif self.order.status != enums.OrderStatus.TRAILING:
                 self._adjust_stop_loss()
 
     def _close_order(self, data):
         self.order.closeprice = data["closeprice"]
         self.order.closetm = data["closetm"]
         self.order.close_status = self.order.get_close_status()
+        self.order.status = enums.OrderStatus.CLOSED
         self.order.net = data["net"]
         self.order.rvr = self.order.get_rvr()
         self.order.save()
@@ -511,12 +493,16 @@ class Bot(models.Model):
         if full:
             self.order_set.all().delete()  # type: ignore
 
-    def log(self, text):
-        print(f"[!] {self} {text}...")
+    def log(self, text, msg=False):
+        print(f"[+] {self} {text}...")
         Log.objects.create(
             bot=self,
             text=text,
         )
+        if msg:
+            requests.get(
+                f"https://api.telegram.org/bot{settings.TELEGRAM_API}/sendMessage?chat_id={settings.TELEGRAM_CHAT}&text={self}:%20{text}"
+            )
 
 
 class BotGroup(models.Model):
@@ -560,8 +546,8 @@ class BotGroup(models.Model):
     trail_multiplier = models.FloatField(
         default=0.3, verbose_name="ATR multiplier for trailing stop/loss"
     )
-    limit_multiplier = models.FloatField(
-        default=0.1, verbose_name="ATR multiplier for limit"
+    limit_multiplier = models.PositiveSmallIntegerField(
+        default=3, verbose_name="PIP multiplier for limit"
     )
     on_status = models.BooleanField(default=True, verbose_name="On/Off")
     autorefresh = models.BooleanField(

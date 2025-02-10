@@ -37,6 +37,7 @@ class OrderStatus(models.TextChoices):
     CANCELLED = "CANCELLED"
     OPEN = "OPEN"
     CLOSED = "CLOSED"
+    TRAILING = "TRAILING"
 
 
 class BotHealth(models.TextChoices):

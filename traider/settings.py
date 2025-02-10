@@ -206,6 +206,11 @@ OANDA_BASE_URL = os.environ.get(
     f"{APP_NAME}_OANDA_BASE_URL", "https://api-fxpractice.oanda.com/v3/"
 )
 
+# Telegram
+
+TELEGRAM_API = os.environ.get(f"{APP_NAME}_TELEGRAM_API")
+TELEGRAM_CHAT = os.environ.get(f"{APP_NAME}_TELEGRAM_CHATID")
+
 # Other
 
 X_FRAME_OPTIONS = "SAMEORIGIN"

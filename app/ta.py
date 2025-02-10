@@ -83,9 +83,6 @@ def get_trend(df: pd.DataFrame):
     df.loc[~df["Date"].isin(g["Date"].last()), ["UpT", "DnT"]] = False
     try:
         df.loc[df3.index[0], "UpT"] = df.loc[df3.index[0], "HH"]  # type: ignore
-    except IndexError:
-        pass
-    try:
         df.loc[df3.index[0], "DnT"] = df.loc[df3.index[0], "LL"]  # type: ignore
     except IndexError:
         pass

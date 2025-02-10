@@ -21,19 +21,13 @@ def get_long_trend(data: dict):
 
 
 def get_short_trend(df: DataFrame):
-    ATR = df.ATR.iloc[-2]
     df2 = df[df.H | df.L]
     last = df2.iloc[-2]
-    prev = df2.iloc[-3]
     if last.DnT and candle_is_bullish(df):
         return {
             "order_dir": OrderDir.LONG,
-            "stopprice": last.Low - 0.1 * ATR,
-            "tpprice": prev.Low,
         }
     if last.UpT and candle_is_bearish(df):
         return {
             "order_dir": OrderDir.SHORT,
-            "stopprice": last.High + 0.1 * ATR,
-            "tpprice": prev.High,
         }

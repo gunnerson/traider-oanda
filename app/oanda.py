@@ -67,7 +67,7 @@ class Api:
                 )
         except (ConnectionError, ReadTimeout):
             print(
-                f"[-] OANDA-API endpoint '{endpoint}' returned with error 'ConnectionError'."
+                f"[-] OANDA-API endpoint '{endpoint}' returned with error 'ConnectionError'"
             )
             return None
 
@@ -140,23 +140,29 @@ class Endpoint:
         pair: str | None = None,
         vol: int | float | None = None,
         price: float | None = None,
-        trade_id: str | None = None,
-        distance: int | float | None = None,
         stopprice: float | None = None,
+        trade_id: str | None = None,
+        order_type: enums.OrderType | None = enums.OrderType.MARKET,
     ) -> dict:
-        params = {
-            "order": {
-                "type": enums.OrderType.MARKET,
-                "instrument": pair,
-                "units": str(vol),
-                "priceBound": str(price),
-                "stopLossOnFill": {"price": str(stopprice)},
-            }
-        }
+        params: dict = {"order": {"type": order_type}}
+        if pair:
+            params["order"]["instrument"] = pair
+        if vol:
+            params["order"]["units"] = str(vol)
+        if price:
+            if order_type == enums.OrderType.MARKET:
+                params["order"]["priceBound"] = str(price)
+            elif order_type == enums.OrderType.TRAILING_STOP_LOSS:
+                params["order"]["distance"] = str(price)
+                params["order"]["tradeID"] = trade_id
+            else:
+                params["order"]["price"] = str(price)
+        if stopprice:
+            params["order"]["stopLossOnFill"] = {"price": str(stopprice)}
         return self.api.send_request(
             enums.Method.POST,
             f"accounts/{self.api.api_account}/orders",
-            params,  # type: ignore
+            params,
         )
 
     def change_order(

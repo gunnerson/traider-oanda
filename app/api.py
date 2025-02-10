@@ -80,13 +80,12 @@ def open_position(
 
 def adjust_stop_loss(
     distance: float,
-    sl_id: str,
     trade_id: str,
 ) -> str:
-    if data := api.change_order(
-        distance,
-        sl_id,
-        trade_id,
+    if data := api.place_order(
+        price=distance,
+        trade_id=trade_id,
+        order_type=enums.OrderType.TRAILING_STOP_LOSS,
     ):
         return data["orderCreateTransaction"]["id"]
     return ""

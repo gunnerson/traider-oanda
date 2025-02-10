@@ -30,6 +30,6 @@
 </nav>
 {% block page_js %}
 <script>
-  document.getElementById("nav-" + window.location.toString().replace(/^https?:\/\//, '').split('/')[2]).classList.add('active');
+  for (let x of document.getElementById("nav-" + window.location.toString().split('/')[4]) {x.classList.add('active');}
 </script>
 {% endblock page_js %}

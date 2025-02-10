@@ -16,7 +16,7 @@
       </thead>
       <tbody>
         {% for order in orders %}
-          <tr class="{% if order.close_status == 'T' %}bg-green-700{% else %}bg-red-700{% endif %}">
+          <tr class="{% if order.close_status == 'P' %}bg-green-700{% else %}bg-red-700{% endif %}">
             <td class="text-center">
               <a href="{% url 'admin:app_order_change' order.id %}" target="_blank">&nbsp;&nbsp;&nbsp;{{ order.id }}&nbsp;&nbsp;&nbsp;</a>
             </td>
