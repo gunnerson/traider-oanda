@@ -499,7 +499,7 @@ class Bot(models.Model):
             bot=self,
             text=text,
         )
-        if msg:
+        if msg and settings.TELEGRAM_API:
             requests.get(
                 f"https://api.telegram.org/bot{settings.TELEGRAM_API}/sendMessage?chat_id={settings.TELEGRAM_CHAT}&text={self}:%20{text}"
             )
