@@ -114,3 +114,5 @@ ExecStart=/bin/sh -c '/opt/traider/env/bin/celery -A app worker --beat -P solo -
 [Install]
 WantedBy=multi-user.target
 ~~~
+
+[![Demo](https://img.youtube.com/vi/Xm2UHNYUeLg/0.jpg)](https://www.youtube.com/watch?v=Xm2UHNYUeLg)
